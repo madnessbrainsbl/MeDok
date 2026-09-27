@@ -131,7 +131,7 @@ if ($очищено -gt 0) {
     "  скрыто локальных путей: $очищено"
 }
 
-$куда = Join-Path $корень 'vypiska.exe'
+$куда = Join-Path $корень 'MeDok.exe'
 Copy-Item $exe $куда -Force
 "  разложено: $куда"
 "  размер: {0:N2} МиБ" -f ((Get-Item $exe).Length / 1MB)

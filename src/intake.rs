@@ -543,7 +543,7 @@ pub fn open_port_command(port: u16) -> (String, String) {
     if cfg!(windows) {
         return (
             format!(
-                "netsh advfirewall firewall add rule name=\"Выписки: приём снимков\" \
+                "netsh advfirewall firewall add rule name=\"МеДок: приём снимков\" \
                  dir=in action=allow protocol=TCP localport={port}"
             ),
             format!(

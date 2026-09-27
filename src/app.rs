@@ -2048,7 +2048,7 @@ impl App {
                     .inner_margin(egui::Margin::symmetric(ui::PAD, 14)),
             )
             .show(ctx, |u| {
-                u.label(egui::RichText::new("Выписки").size(18.0).strong());
+                u.label(egui::RichText::new("МеДок").size(18.0).strong());
                 ui::hint(
                     u,
                     "Выписка формы 027/у из направления и пакет документов одним файлом",

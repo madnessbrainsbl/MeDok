@@ -10,7 +10,7 @@ fn main() {
     // и видно, на каком шаге встало.
     vypiska::note_new_session();
     note(&format!(
-        "запуск: Выписки {}, автор {}, система {}",
+        "запуск: МеДок {}, автор {}, система {}",
         env!("CARGO_PKG_VERSION"),
         vypiska::АВТОР,
         std::env::consts::OS
@@ -32,14 +32,14 @@ fn main() {
     let mut viewport = egui::ViewportBuilder::default()
         .with_inner_size([880.0, 500.0])
         .with_min_inner_size([680.0, 420.0])
-        .with_title("Выписки");
+        .with_title("МеДок");
     if let Some(i) = icon {
         viewport = viewport.with_icon(std::sync::Arc::new(i));
     }
 
     note("открываю окно…");
     let run = eframe::run_native(
-        "Выписки",
+        "МеДок",
         eframe::NativeOptions {
             viewport,
             ..Default::default()
@@ -89,7 +89,7 @@ fn окружение() {
 fn alert(text: &str) {
     let _ = rfd::MessageDialog::new()
         .set_level(rfd::MessageLevel::Error)
-        .set_title("Выписки")
+        .set_title("МеДок")
         .set_description(text)
         .show();
 }

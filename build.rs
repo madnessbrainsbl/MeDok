@@ -22,10 +22,10 @@ fn embed_icon() {
     println!("cargo:rerun-if-changed=assets/vypiska.ico");
     let mut res = winresource::WindowsResource::new();
     res.set_icon("assets/vypiska.ico");
-    res.set("ProductName", "Выписки");
+    res.set("ProductName", "МеДок");
     res.set(
         "FileDescription",
-        "Генератор выписок формы 27 из направления КУМки",
+        "Направление, выписка и обследования в одном PDF",
     );
     // Авторство: свойства файла — то место, где оно уместно и переживёт
     // пересылку. В самом документе выписки подписи разработчика быть не
@@ -33,7 +33,7 @@ fn embed_icon() {
     // врача, и посторонняя фамилия там вызывает вопросы.
     res.set("CompanyName", AVTOR);
     res.set("LegalCopyright", &format!("© 2026 {AVTOR}"));
-    res.set("OriginalFilename", "vypiska.exe");
+    res.set("OriginalFilename", "MeDok.exe");
     if let Err(e) = res.compile() {
         println!("cargo:warning=иконку встроить не вышло: {e}");
     }
