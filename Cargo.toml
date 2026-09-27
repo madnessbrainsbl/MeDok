@@ -1,0 +1,65 @@
+[package]
+name = "vypiska"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1"
+zip = { version = "8", default-features = false, features = ["deflate"] }
+quick-xml = "0.42"
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+typst-as-lib = "0.16"
+typst = "0.15"
+typst-pdf = "0.15"
+typst-layout = "0.15"
+image = "0.25"
+lopdf = "0.45"
+# Растеризация чужого векторного PDF: чистый Rust, без DLL и внешних программ.
+# В дереве он уже есть — им typst-render рисует PDF, вложенные в документ, —
+# поэтому новых крейтов не появляется. default-features выключены ровно как у
+# typst-render: иначе в exe приедут 14 стандартных шрифтов и 61 CMap, а нужные
+# шрифты векторный PDF везёт с собой сам.
+hayro = { version = "0.7", default-features = false }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.151"
+rfd = "0.17.2"
+tiny_http = "0.12.0"
+qrcode = "0.14.1"
+local-ip-address = "0.6.13"
+getrandom = "0.3"
+typst-render = "0.15"
+typst-utils = "0.15"
+
+# egui рисует окно через winit, а тому на Linux обязательно нужен хотя бы
+# один оконный протокол (X11 или Wayland) — без них winit не собирается
+# вовсе («platform not supported»). На Windows это не нужно вообще: там
+# своя система окон, и лишние протоколы только раздували бы дерево
+# зависимостей и время сборки, поэтому фичи разведены по цели.
+[target.'cfg(windows)'.dependencies]
+eframe = { version = "0.32", default-features = false, features = ["glow", "default_fonts"] }
+
+[target.'cfg(unix)'.dependencies]
+eframe = { version = "0.32", default-features = false, features = ["glow", "default_fonts", "x11", "wayland"] }
+# Шифрование карточек пациентов на Linux (на Windows эту роль играет DPAPI).
+# Нужен именно AEAD: шифр без метки подлинности не отличает расшифровку от
+# мусора — неверный ключ выдал бы случайные байты вместо ошибки, а подменённый
+# байт тихо изменил бы текст анамнеза. Собирать шифр с MAC руками нельзя.
+# Крейт из RustCrypto, без unsafe и без зависимостей от системных библиотек;
+# chacha20 и cipher в дереве уже лежат (их тянет zip), новыми приезжают только
+# aead и poly1305. default-features выключены: нужен лишь `alloc`, источник
+# случайных чисел свой — /dev/urandom.
+chacha20poly1305 = { version = "0.11", default-features = false, features = ["alloc"] }
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+strip = true
+
+[dev-dependencies]
+chrono = { version = "0.4", default-features = false }
+
+# Иконка и метаданные версии — это ресурсы PE-файла, у ELF на Linux такого
+# понятия нет вовсе; крейт и не собирается за пределами Windows.
+[target.'cfg(windows)'.build-dependencies]
+winresource = "0.1.31"

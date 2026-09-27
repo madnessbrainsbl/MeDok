@@ -1,0 +1,9 @@
+Libertinus Serif — SIL Open Font License 1.1
+https://github.com/alerque/libertinus
+
+Шрифт вшит в программу как запасной: если на машине нет Times New Roman,
+выписка всё равно наберётся кириллицей и документ не развалится.
+Полный текст лицензии: https://openfontlicense.org/
+
+Copyright (c) The Libertinus Project Authors.
+This Font Software is licensed under the SIL Open Font License, Version 1.1.
