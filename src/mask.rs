@@ -111,6 +111,20 @@ pub fn birth_cert(raw: &str) -> String {
     raw.to_uppercase()
 }
 
+/// Паспорт РФ: серия из четырёх цифр и номер из шести — `0412 345678`.
+/// Только цифры: буквы в паспорте не встречаются, а поле то же текстовое.
+pub fn passport(raw: &str) -> String {
+    let d: Vec<char> = raw.chars().filter(|c| c.is_ascii_digit()).take(10).collect();
+    let mut out = String::new();
+    for (i, c) in d.iter().enumerate() {
+        if i == 4 {
+            out.push(' ');
+        }
+        out.push(*c);
+    }
+    out
+}
+
 /// ЧДД и ЧСС: только цифры, не больше трёх. Формата тут нет — это её
 /// собственный осмотр, а не номер документа, — но поле то же текстовое,
 /// и без фильтра в него подряд вписывались буквы.
@@ -219,6 +233,15 @@ mod tests {
         assert_eq!(phone("77"), "+7 (77");
         // огрызок без цифр поле очищает целиком
         assert_eq!(phone("+7 ("), "");
+    }
+
+    #[test]
+    fn passport_is_series_and_number() {
+        assert_eq!(passport("0412345678"), "0412 345678");
+        assert_eq!(passport("04 12 345678"), "0412 345678");
+        assert_eq!(passport("0412"), "0412");
+        assert_eq!(passport("04123456789"), "0412 345678", "лишняя цифра");
+        assert_eq!(passport("серия 04"), "04", "буквы не проходят");
     }
 
     #[test]

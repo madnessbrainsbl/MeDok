@@ -381,6 +381,10 @@ pub struct Card {
     pub fio: String,
     pub phone: String,
     pub birth_cert: String,
+    /// В поле документа — паспорт, а не свидетельство о рождении. Старые
+    /// карточки этого ключа не знают и читаются как свидетельство — так и
+    /// было до появления выбора.
+    pub passport: bool,
     pub organized: String,
     pub diagnosis: String,
     pub anamnesis_life: String,
@@ -637,6 +641,7 @@ mod tests {
             fio: "Иванов Иван Иванович".into(),
             phone: "89000000000".into(),
             birth_cert: "III-АА 000001".into(),
+            passport: false,
             organized: "Школа (пример), 6 класс".into(),
             diagnosis: "Z00.1 Профилактический осмотр".into(),
             anamnesis_life: "Тестовые сведения об анамнезе жизни.".into(),

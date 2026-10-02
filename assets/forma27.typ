@@ -55,7 +55,7 @@
 #row("Домашний адрес", d.address, line: true)
 #row("Контактный телефон:", d.phone)
 #row("СНИЛС", d.snils)
-#row("Свидетельство о рождении:", d.birth_cert)
+#row(d.id_doc, d.birth_cert)
 #row("Страховой полис: ОМС: серия №", d.policy, bold: true)
 #row("Организованность:", d.organized)
 

@@ -30,6 +30,8 @@ struct Patient {
     phone: String,
     snils: String,
     birth_cert: String,
+    /// В строке документа паспорт, а не свидетельство о рождении.
+    passport: bool,
     organized: String,
     complaints: String,
     chdd: String,
@@ -41,6 +43,16 @@ struct Patient {
 }
 
 impl Patient {
+    /// Сменить вид документа. Номер прежнего очищается: номер свидетельства
+    /// под подписью «Паспорт» (и наоборот) — неправда в документе, который
+    /// уходит в другое учреждение.
+    fn set_passport(&mut self, on: bool) {
+        if self.passport != on {
+            self.passport = on;
+            self.birth_cert.clear();
+        }
+    }
+
     /// Заготовка анамнеза жизни подставляется сразу, чтобы врач проверил
     /// и заполнил её при приёме.
     fn new(life_template: &str) -> Self {
@@ -234,6 +246,15 @@ impl App {
                 if self.pat.address.trim().is_empty() {
                     self.pat.address = n.address_by_fact().to_string();
                 }
+                // Вид документа — по возрасту: паспорт в России выдают в 14
+                // лет. Только пока номер не вписан: выбранное и заполненное
+                // руками не переигрываем.
+                if self.pat.birth_cert.trim().is_empty() {
+                    if let Some(date) = fmt::to_date(&n.dob) {
+                        self.pat.passport =
+                            fmt::age_months(date, fmt::today()).is_some_and(|m| m >= 14 * 12);
+                    }
+                }
                 self.src_name = path
                     .file_name()
                     .map(|s| s.to_string_lossy().into_owned())
@@ -374,6 +395,7 @@ impl App {
         v.phone = p.phone.clone();
         v.snils = p.snils.clone();
         v.birth_cert = p.birth_cert.clone();
+        v.passport = p.passport;
         v.organized = p.organized.clone();
         v.complaints = p.complaints.clone();
         v.chdd = p.chdd.clone();
@@ -979,7 +1001,15 @@ impl App {
                 // Порядок здесь обратный: раскладка справа налево, поэтому
                 // надпись добавляется ПЕРВОЙ и встаёт у правого края, а кнопка
                 // с сообщениями занимает всё, что осталось слева.
-                u.with_layout(egui::Layout::right_to_left(egui::Align::Center), |u| {
+                // Ряд — высотой с кнопку, и ни пикселем больше. Отдать ему
+                // `with_layout` значит отдать всю оставшуюся высоту окна: в
+                // нижней панели это пространство до самого верха. Ряд
+                // центрировал по нему своё содержимое, панель подстраивалась
+                // под то, где оно оказалось, и на следующем кадре получала ещё
+                // больше — за пару секунд нижняя полоса съедала середину окна.
+                // Врач: «когда я диагноз пишу, всё сворачивает, всё окно».
+                let bar = egui::vec2(u.available_width(), ui::BUTTON_H);
+                u.allocate_ui_with_layout(bar, egui::Layout::right_to_left(egui::Align::Center), |u| {
                     // Кликабельна: за ней спрятано окно «О программе» с
                     // условиями использования. Отдельной кнопки не даём —
                     // врачу она не нужна ни разу за приём. Но раз уж кликается,
@@ -1011,7 +1041,7 @@ impl App {
                         egui::Color32::PLACEHOLDER,
                     );
                     let (rect, resp) = u.allocate_exact_size(
-                        egui::vec2(galley.size().x, 38.0),
+                        egui::vec2(galley.size().x, ui::BUTTON_H),
                         egui::Sense::click(),
                     );
                     let hovered = resp.hovered();
@@ -1047,7 +1077,10 @@ impl App {
                     // «Сохранено …» и напоминание про незагруженную печать, — и
                     // без переноса вторая просто обрезается по краю окна.
                     let row = egui::Layout::left_to_right(egui::Align::Center).with_main_wrap(true);
-                    let space = u.available_size();
+                    // Та же высота, что у внешнего ряда, и по той же причине.
+                    // Понадобится перенос на вторую строку — ряд вырастет
+                    // ровно на неё и остановится.
+                    let space = egui::vec2(u.available_width(), ui::BUTTON_H);
                     u.allocate_ui_with_layout(space, row, |u| {
                         let package_tab = self.tab == Tab::Package;
                         let ready = if package_tab {
@@ -1061,7 +1094,7 @@ impl App {
                             "Сохранить выписку"
                         };
                         let btn = egui::Button::new(egui::RichText::new(title).size(15.0))
-                            .min_size(egui::vec2(190.0, 38.0));
+                            .min_size(egui::vec2(190.0, ui::BUTTON_H));
                         if u.add_enabled(ready, btn).clicked() {
                             if package_tab {
                                 self.build_package();
@@ -1077,7 +1110,7 @@ impl App {
                         if !package_tab {
                             u.add_space(8.0);
                             let p = egui::Button::new(egui::RichText::new("Печать").size(15.0))
-                                .min_size(egui::vec2(120.0, 38.0));
+                                .min_size(egui::vec2(120.0, ui::BUTTON_H));
                             if u.add_enabled(ready, p).clicked() {
                                 self.print_vypiska();
                             }
@@ -1195,11 +1228,28 @@ impl App {
             );
             u.end_row();
 
-            ui::label(u, "Свидетельство о рождении");
-            // Здесь не только цифры — серия римская и буквенная.
-            if ui::edit_hint(u, &mut self.pat.birth_cert, "IV-БА ______").lost_focus() {
-                self.pat.birth_cert = crate::mask::birth_cert(&self.pat.birth_cert);
-            }
+            // Документ бывает двух видов: у детей — свидетельство о рождении,
+            // с 14 лет — паспорт. Врач: «сделать опциональной, типа выбрать
+            // свидетельство или паспорт, а то вот сейчас взрослого делала».
+            // Выбор стоит прямо в строке, перед полем, а не в настройках: он
+            // свой у каждого пациента.
+            ui::label(u, "Документ");
+            u.horizontal(|u| {
+                if u.selectable_label(!self.pat.passport, "Свидетельство").clicked() {
+                    self.pat.set_passport(false);
+                }
+                if u.selectable_label(self.pat.passport, "Паспорт").clicked() {
+                    self.pat.set_passport(true);
+                }
+                if self.pat.passport {
+                    ui::edit_digits(u, &mut self.pat.birth_cert, "____ ______", crate::mask::passport);
+                } else {
+                    // Здесь не только цифры — серия римская и буквенная.
+                    if ui::edit_hint(u, &mut self.pat.birth_cert, "IV-БА ______").lost_focus() {
+                        self.pat.birth_cert = crate::mask::birth_cert(&self.pat.birth_cert);
+                    }
+                }
+            });
             u.end_row();
 
             ui::label(u, "Организованность");
@@ -1494,6 +1544,7 @@ impl App {
             fio: self.nap.as_ref().map(|n| n.fio.clone()).unwrap_or_default(),
             phone: p.phone.clone(),
             birth_cert: p.birth_cert.clone(),
+            passport: p.passport,
             organized: p.organized.clone(),
             diagnosis: p.diagnosis.clone(),
             anamnesis_life: p.anamnesis_life.clone(),
@@ -1514,6 +1565,7 @@ impl App {
     fn apply_card(&mut self, c: store::Card) {
         self.pat.phone = c.phone;
         self.pat.birth_cert = c.birth_cert;
+        self.pat.passport = c.passport;
         self.pat.organized = c.organized;
         self.pat.diagnosis = c.diagnosis;
         self.pat.anamnesis_life = c.anamnesis_life;
@@ -1808,6 +1860,19 @@ impl App {
         // сохранение чем-то заблокировано. Со вкладки «Пакет» причины не
         // видно вовсе: внизу там свои сообщения, про пакет. Поэтому говорим
         // прямо здесь и называем, что именно мешает.
+        // Направление в пакете, а печати в профиле нет — оно уйдёт без
+        // оттиска. На первой вкладке об этом говорит нижняя строка, а здесь
+        // молчало: врач собирала пакет и узнавала, что «печать слетела»,
+        // только глядя в готовый файл.
+        if self.sources.iter().any(|s| s.kind == package::Kind::Referral) {
+            if let Some(msg) = self.ink_not_loaded() {
+                ui::warn(u, &format!("Направление уйдёт без печати: {msg}."));
+                ui::hint(
+                    u,
+                    "Загрузите в Настройках → «Печать и подпись» и добавьте направление заново.",
+                );
+            }
+        }
         if !self
             .sources
             .iter()
@@ -2391,6 +2456,46 @@ mod tests {
         );
     }
 
+    /// Номер свидетельства под подписью «Паспорт» — неправда в документе.
+    /// Переключили вид — прежний номер уходит, вписывается новый.
+    #[test]
+    fn switching_to_the_passport_clears_the_certificate_number() {
+        let mut p = Patient::new("");
+        p.birth_cert = "III-АА 000001".into();
+        p.set_passport(true);
+        assert!(p.passport);
+        assert_eq!(p.birth_cert, "", "номер свидетельства остался под подписью «Паспорт»");
+        // Повторный выбор того же вида вписанное не трогает.
+        p.birth_cert = "0412 345678".into();
+        p.set_passport(true);
+        assert_eq!(p.birth_cert, "0412 345678");
+
+        // А двенадцатилетнему по умолчанию — свидетельство.
+        let mut a = bare();
+        a.open_odt(&sample());
+        assert!(!a.pat.passport, "двенадцатилетнему выбран паспорт");
+    }
+
+    /// «Печать слетела с направления». В профиле не было печати, и
+    /// направление ушло без оттиска, а вкладка «Пакет» об этом молчала —
+    /// врач узнала, только открыв готовый файл.
+    #[test]
+    fn the_package_tab_warns_about_an_unstamped_referral() {
+        let ctx = egui::Context::default();
+        let mut a = bare();
+        at_work(&mut a);
+        a.tab = Tab::Package;
+        a.set.doc_mut().sign_path = "D:/подпись.png".into();
+        a.sources.push(package::Source {
+            name: "057у.odt".into(),
+            bytes: b"x".to_vec(),
+            kind: package::Kind::Referral,
+        });
+        let items = frame(&ctx, &mut a, vec![]);
+        let all: String = items.iter().map(|(s, _)| s.as_str()).collect();
+        assert!(all.contains("Направление уйдёт без печати"), "молчит: {all}");
+    }
+
     /// Пакет не чистился между детьми вовсе. Собери пакет следующему — и в
     /// краевую ушли бы направление, выписка и обследования прошлого ребёнка.
     /// Это опаснее оставшихся полей: страницы пакета видны только на второй
@@ -2789,6 +2894,48 @@ mod tests {
         assert!(
             all.contains("Текст осмотра"),
             "не названо место, где это чинится: {all}"
+        );
+    }
+
+    /// «Твоя программа, когда я диагноз пишу, всё сворачивает, всё окно». На
+    /// видео окно того же размера, но ряд «Сохранить выписку / Печать» стоит
+    /// посередине, а над ним пусто: нижняя панель с каждым кадром отъедала
+    /// высоту у середины окна, пока не съела её целиком.
+    ///
+    /// Включалось, когда документ становился готовым и внизу появлялось
+    /// предупреждение про незагруженную печать, — поэтому проверяем именно
+    /// готовый документ и много кадров подряд: за один кадр рост не виден.
+    #[test]
+    fn the_bottom_bar_does_not_eat_the_window() {
+        let ctx = egui::Context::default();
+        let mut a = bare();
+        at_work(&mut a);
+        assert!(a.problems().is_empty(), "документ не готов: {:?}", a.problems());
+        let y = |items: &[(String, egui::Rect)], t: &str| {
+            items.iter().find(|(s, _)| s.trim() == t).map(|(_, r)| r.center().y)
+        };
+        let first = frame(&ctx, &mut a, vec![]);
+        let button = y(&first, "Сохранить выписку").expect("кнопки нет");
+        let settings = y(&first, "Настройки").expect("кнопки настроек нет");
+        let mut last = first;
+        for _ in 0..60 {
+            last = frame(&ctx, &mut a, vec![]);
+        }
+        let later = y(&last, "Сохранить выписку").expect("кнопка пропала");
+        assert!(
+            (later - button).abs() < 1.0,
+            "нижняя панель растёт: кнопка была на {button}, через 60 кадров на {later}"
+        );
+        // Верхняя полоса устроена так же — ряд, прижатый вправо, — и
+        // болеет тем же, если отдать ей лишнюю высоту.
+        let settings_later = y(&last, "Настройки").expect("кнопка настроек пропала");
+        assert!(
+            (settings_later - settings).abs() < 1.0,
+            "верхняя панель растёт: «Настройки» были на {settings}, стали на {settings_later}"
+        );
+        assert!(
+            y(&last, "Диагноз основной").is_some(),
+            "середину окна задавило: поля «Диагноз основной» больше не видно"
         );
     }
 

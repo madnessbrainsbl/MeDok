@@ -73,6 +73,11 @@ pub struct Vypiska {
     pub phone: String,
     pub snils: String,
     pub birth_cert: String,
+    /// Что в `birth_cert`: паспорт или свидетельство о рождении. От этого
+    /// зависит подпись строки в документе — у взрослых и подростков с 14 лет
+    /// документ паспорт, и строка «Свидетельство о рождении» с номером
+    /// паспорта была бы неправдой.
+    pub passport: bool,
     pub policy: String,
     pub organized: String,
     /// Клинический диагноз, а не код повода из направления. Решение остаётся за врачом.
@@ -172,6 +177,10 @@ impl From<Vypiska> for Dict {
             ("phone", v.phone),
             ("snils", v.snils),
             ("birth_cert", v.birth_cert),
+            (
+                "id_doc",
+                if v.passport { "Паспорт:" } else { "Свидетельство о рождении:" }.to_string(),
+            ),
             ("policy", v.policy),
             ("organized", v.organized),
             ("diagnosis", v.diagnosis),
@@ -397,6 +406,24 @@ mod tests {
                 panic!("документ не собрался с размером печати {cm} см: {e:#}");
             }
         }
+    }
+
+    /// У взрослых и подростков с 14 лет документ — паспорт. Строка
+    /// «Свидетельство о рождении» с номером паспорта была бы неправдой в
+    /// документе, который уходит в другое учреждение.
+    #[test]
+    fn the_document_line_says_what_the_document_is() {
+        let mut v = filled();
+        v.birth_cert = "0412 345678".into();
+        v.passport = true;
+        let text = all_text(&compile(v).expect("собирается"));
+        assert!(text.contains("Паспорт"), "в документе нет строки «Паспорт»");
+        assert!(!text.contains("Свидетельство о рождении"), "осталась строка свидетельства");
+
+        let mut v = filled();
+        v.birth_cert = "III-АА 000001".into();
+        let text = all_text(&compile(v).expect("собирается"));
+        assert!(text.contains("Свидетельство о рождении"), "у ребёнка пропало свидетельство");
     }
 
     #[test]
